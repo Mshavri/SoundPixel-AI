@@ -3,17 +3,18 @@ import numpy as np
 import os
 
 def calculate_metrics(original_path, received_path):
-    # 1. تحميل الصور
-    img1 = cv2.imread(original_path, cv2.IMREAD_GRAYSCALE)
-    img2 = cv2.imread(received_path, cv2.IMREAD_GRAYSCALE)
-
+    img1 = cv2.imread(original_path)
+    img2 = cv2.imread(received_path)
+    # استمر في باقي الكود مع تغيير الحجم لـ 128
+    
     if img1 is None or img2 is None:
         print("Error: Files not found for analysis.")
         return
 
     # 2. توحيد الحجم للمقارنة
-    img1 = cv2.resize(img1, (64, 64))
-    img2 = cv2.resize(img2, (64, 64))
+   # توحيد الحجم إلى 128 بدلاً من 64
+    img1 = cv2.resize(img1, (128, 128))
+    img2 = cv2.resize(img2, (128, 128))
 
     # 3. حساب متوسط الخطأ التربيعي (MSE)
     mse = np.mean((img1 - img2) ** 2)
