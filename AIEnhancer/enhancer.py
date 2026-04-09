@@ -1,44 +1,56 @@
 import cv2
 import os
+import numpy as np
 
 def enhance_image(input_name):
-    # إعداد المسارات بدقة
-    model_path = "../Models/EDSR_x4.pb"
-    image_path = f"../Outputs/{input_name}"
-    output_path = "../Outputs/final_ai_image.png"
+    try:
+        # إعداد المسارات بدقة
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.join(base_dir, "..", "Models", "EDSR_x4.pb")
+        image_path = os.path.join(base_dir, "..", "Outputs", input_name)
+        output_path = os.path.join(base_dir, "..", "Outputs", "final_ai_image.png")
 
-    # التحقق من وجود الموديل
-    if not os.path.exists(model_path):
-        print(f"Error: Model not found at {model_path}")
-        return
+        # 1. التحقق من وجود الموديل
+        if not os.path.exists(model_path):
+            print(f"[ERROR] AI Model missing at: {model_path}")
+            return False
 
-    # 1. إنشاء كائن تحسين الدقة (Super Resolution)
-    sr = cv2.dnn_superres.DnnSuperResImpl_create()
+        # 2. التحقق من وجود الصورة الخام
+        if not os.path.exists(image_path):
+            print(f"[ERROR] Image to enhance not found at: {image_path}")
+            return False
 
-    print("Loading AI Model into memory... please wait.")
-    sr.readModel(model_path)
-    sr.setModel("edsr", 4) # استخدام موديل EDSR وتكبير الصورة 4 مرات
+        # تحميل الموديل
+        sr = cv2.dnn_superres.DnnSuperResImpl_create()
+        sr.readModel(model_path)
+        sr.setModel("edsr", 4) 
 
-    # 2. قراءة الصورة المستلمة المشوشة
-    img = cv2.imread(image_path)
-    if img is None:
-        print(f"Error: Could not find {image_path}")
-        return
+        img = cv2.imread(image_path)
+        if img is None:
+            print("[ERROR] Failed to read image. File might be corrupted.")
+            return False
 
-    print("AI is now analyzing and reconstructing pixels...")
-    
-    # 3. معالجة الصورة بالذكاء الاصطناعي
-    result = sr.upsample(img)
+        print("AI Step: Upscaling (Preserving Texture)...")
+        upscaled = sr.upsample(img)
 
-    # 4. حفظ النتيجة النهائية
-    cv2.imwrite(output_path, result)
-    print("-" * 30)
-    print(f"SUCCESS: Image enhanced!")
-    print(f"Original Size: 64x64")
-    print(f"AI Output Size: 256x256")
-    print(f"File saved: Outputs/final_ai_image.png")
-    print("-" * 30)
+        print("Post-Processing: Gentle Sharpening...")
+        kernel = np.array([[-0.5,-0.5,-0.5], [-0.5,5,-0.5], [-0.5,-0.5,-0.5]])
+        final_result = cv2.filter2D(upscaled, -1, kernel)
+
+        cv2.imwrite(output_path, final_result)
+        
+        print("-" * 30)
+        print("SUCCESS: Realistic Enhancement Complete!")
+        print(f"Final Size: {final_result.shape[1]}x{final_result.shape[0]}")
+        print("-" * 30)
+        return True
+
+    except cv2.error as e:
+        print(f"[AI ERROR] OpenCV failed: {e}")
+        return False
+    except Exception as e:
+        print(f"[CRITICAL ERROR] Enhancer failed: {e}")
+        return False
 
 if __name__ == "__main__":
-    # سنقوم بتحسين الصورة التي استخرجناها من الصوت سابقاً
     enhance_image("received_raw.png")

@@ -1,0 +1,13 @@
+Processed: beeeb.jpeg (Image Name)
+MSE: 2.20 (Error Level)
+PSNR: 37.13 dB (Quality Level)
+Status: Success
+------------------------------------------------------------
+FINAL PERFORMANCE: MSE[2.20] / PSNR[37.13dB]
+RESULT: Excellent
+------------------------------------------------------------
+QUALITY SCALE GUIDE (PSNR):
+* Above 35 dB: Excellent (Identity to original)
+* 30 - 35 dB: Good (High reconstruction quality)
+* 20 - 30 dB: Fair (Acceptable, some noise visible)
+* Below 20 dB: Poor (Significant data loss)

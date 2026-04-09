@@ -1,9 +1,9 @@
 @echo off
-title SoundPixel-AI Master System
+title SoundPixel-AI Auto System
 cls
 
 echo =====================================================
-echo           SOUNDPIXEL-AI: SYSTEM START
+echo           SOUNDPIXEL-AI: AUTO DETECTION START
 echo =====================================================
 
 :: 1. Clean Output Folder
@@ -13,23 +13,23 @@ if exist Outputs (
 )
 echo Done.
 
-:: 2. Run Encoder (Image to Sound)
+:: 2. Run Encoder (يتحقق تلقائياً من الصورة)
 echo.
-echo [2/5] Running Encoder: Image to Sound...
+echo [2/5] Searching for image and Encoding...
 cd SignalCore
 python encoder.py
 cd ..
 
-:: 3. Run Decoder (Sound to Image)
+:: 3. Run Decoder
 echo.
-echo [3/5] Running Decoder: Sound back to Image...
+echo [3/5] Running Decoder...
 cd SignalCore
 python decoder.py
 cd ..
 
 :: 4. Run AI Enhancer
 echo.
-echo [4/5] Running AI: Enhancing Image Quality...
+echo [4/5] Running AI Enhancement...
 cd AIEnhancer
 python enhancer.py
 cd ..
