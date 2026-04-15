@@ -13,25 +13,31 @@ def get_first_image():
         files_found.extend(glob.glob(os.path.join(input_folder, t)))
     return os.path.basename(files_found[0]) if files_found else None
 
-def image_to_audio():
+def image_to_audio(image_name=None):
     try:
-        image_name = get_first_image()
-        if not image_name:
-            print("[ERROR] No image found in Inputs folder. Please add a JPG or PNG file.")
-            return False
-
         base_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        if image_name is None:
+            image_name = get_first_image()
+            if not image_name:
+                print("[ERROR] No image found in Inputs folder.")
+                return False
+        
         input_path = os.path.join(base_dir, "..", "Inputs", image_name)
         output_audio_path = os.path.join(base_dir, "..", "Outputs", "signal.wav")
 
+        if not os.path.exists(input_path):
+            print(f"[ERROR] Image not found at: {input_path}")
+            return False
+
         img = cv2.imread(input_path)
         
-        # التأكد أن الملف هو صورة فعلاً وليس ملفاً تالفاً
         if img is None:
-            print(f"[ERROR] '{image_name}' is not a valid image or is corrupted.")
+            print(f"[ERROR] '{image_name}' is not a valid image.")
             return False
 
         print(f"Processing: {image_name}...")
+        
         img_resized = cv2.resize(img, (128, 128))
         
         sample_rate = 44100
@@ -51,7 +57,7 @@ def image_to_audio():
         return True
 
     except Exception as e:
-        print(f"[CRITICAL ERROR] Something went wrong in Encoder: {e}")
+        print(f"[CRITICAL ERROR] Encoder failed: {e}")
         return False
 
 if __name__ == "__main__":

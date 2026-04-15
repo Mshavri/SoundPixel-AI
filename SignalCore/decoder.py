@@ -6,10 +6,9 @@ import os
 def audio_to_image(audio_name):
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        audio_path = os.path.join(base_dir, "..", "Outputs", audio_name)
+        audio_path = os.path.join(base_dir, "..", "Inputs", audio_name)
         output_image_path = os.path.join(base_dir, "..", "Outputs", "received_raw.png")
 
-        # التأكد من وجود ملف الصوت قبل محاولة القراءة
         if not os.path.exists(audio_path):
             print(f"[ERROR] Audio file not found at: {audio_path}")
             return False
@@ -34,7 +33,6 @@ def audio_to_image(audio_name):
             pixel_val = int(((freq - 1000) / 2000) * 255)
             pixels.append(np.clip(pixel_val, 0, 255))
 
-        # التحقق من اكتمال البيانات قبل بناء الصورة
         if len(pixels) >= total_pixels_per_channel * 3:
             b = np.array(pixels[:total_pixels_per_channel]).reshape((size, size))
             g = np.array(pixels[total_pixels_per_channel:total_pixels_per_channel*2]).reshape((size, size))
