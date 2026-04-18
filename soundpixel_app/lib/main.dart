@@ -11,8 +11,16 @@ import 'package:share_plus/share_plus.dart';
 
 void main() => runApp(const SoundPixelApp());
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Global configuration — editable at runtime via Settings
+// ─────────────────────────────────────────────────────────────────────────────
+class AppConfig {
+  static String serverUrl = 'http://192.168.1.57:8000';
+}
+
 class SoundPixelApp extends StatelessWidget {
   const SoundPixelApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -26,8 +34,83 @@ class SoundPixelApp extends StatelessWidget {
   }
 }
 
-class HomePage extends StatelessWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+// HOME PAGE
+// ─────────────────────────────────────────────────────────────────────────────
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  void _showServerSettings() {
+    final controller = TextEditingController(text: AppConfig.serverUrl);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF161B22),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Server Settings',
+          style: TextStyle(color: Colors.white, fontSize: 16),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Backend URL',
+              style: TextStyle(
+                  color: Colors.white.withOpacity(0.5), fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: controller,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'http://192.168.x.x:8000',
+                hintStyle:
+                    TextStyle(color: Colors.white.withOpacity(0.3)),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.white24),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide:
+                      const BorderSide(color: Color(0xFF4A90E2)),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child:
+                const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final url = controller.text.trim();
+              if (url.isNotEmpty) {
+                AppConfig.serverUrl = url;
+                setState(() {});
+              }
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4A90E2)),
+            child: const Text('Save',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -38,22 +121,41 @@ class HomePage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 10),
-              const Text(
-                'SOUNDPIXEL',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                  letterSpacing: 4,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Encrypted Audio Messaging',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.white.withOpacity(0.4),
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'SOUNDPIXEL',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          letterSpacing: 4,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Encrypted Audio Messaging',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.white.withOpacity(0.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.settings_outlined,
+                      color: Colors.white.withOpacity(0.4),
+                    ),
+                    onPressed: _showServerSettings,
+                    tooltip: 'Server Settings',
+                  ),
+                ],
               ),
               const SizedBox(height: 30),
               Expanded(
@@ -97,9 +199,11 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _menuCard(BuildContext context, String title, String subtitle, IconData icon, Color color, Widget screen) {
+  Widget _menuCard(BuildContext context, String title, String subtitle,
+      IconData icon, Color color, Widget screen) {
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => screen)),
+      onTap: () =>
+          Navigator.push(context, MaterialPageRoute(builder: (_) => screen)),
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
@@ -135,11 +239,12 @@ class HomePage extends StatelessWidget {
   }
 }
 
-// ============================================
+// ─────────────────────────────────────────────────────────────────────────────
 // SENDER SCREEN
-// ============================================
+// ─────────────────────────────────────────────────────────────────────────────
 class SenderScreen extends StatefulWidget {
   const SenderScreen({super.key});
+
   @override
   State<SenderScreen> createState() => _SenderScreenState();
 }
@@ -154,29 +259,46 @@ class _SenderScreenState extends State<SenderScreen> {
     setState(() => _isLoading = true);
 
     try {
-      var request = http.MultipartRequest('POST', Uri.parse("http://10.0.2.2:8000/sender/process"));
-      request.files.add(await http.MultipartFile.fromPath('file', _image!.path));
-      var response = await request.send();
+      final url = '${AppConfig.serverUrl}/sender/process';
+      var request = http.MultipartRequest('POST', Uri.parse(url));
+      request.files
+          .add(await http.MultipartFile.fromPath('file', _image!.path));
+
+      final response = await request
+          .send()
+          .timeout(const Duration(minutes: 5));
 
       if (response.statusCode == 200) {
         _audioBytes = await response.stream.toBytes();
         if (!mounted) return;
         setState(() => _isLoading = false);
         _showAudioDialog();
+      } else {
+        final body = await response.stream.bytesToString();
+        throw Exception(
+            'Server error ${response.statusCode}: $body');
       }
     } catch (e) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showError('$e');
+      }
     }
   }
 
   void _showAudioDialog() {
     showDialog(
       context: context,
-      builder: (context) => AudioPlayerDialog(audioBytes: _audioBytes!),
+      builder: (_) => AudioPlayerDialog(audioBytes: _audioBytes!),
     );
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg, style: const TextStyle(fontSize: 13)),
+      backgroundColor: Colors.red.shade800,
+      duration: const Duration(seconds: 5),
+    ));
   }
 
   @override
@@ -184,7 +306,8 @@ class _SenderScreenState extends State<SenderScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0C10),
       appBar: AppBar(
-        title: const Text('SENDER', style: TextStyle(color: Colors.white, letterSpacing: 2)),
+        title: const Text('SENDER',
+            style: TextStyle(color: Colors.white, letterSpacing: 2)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
@@ -199,7 +322,8 @@ class _SenderScreenState extends State<SenderScreen> {
           children: [
             Text(
               'Select image',
-              style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.4)),
+              style: TextStyle(
+                  fontSize: 13, color: Colors.white.withOpacity(0.4)),
             ),
             const SizedBox(height: 16),
             Expanded(
@@ -213,7 +337,9 @@ class _SenderScreenState extends State<SenderScreen> {
                     ? Center(
                         child: Text(
                           'No image selected',
-                          style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 14),
+                          style: TextStyle(
+                              color: Colors.white.withOpacity(0.3),
+                              fontSize: 14),
                         ),
                       )
                     : ClipRRect(
@@ -228,15 +354,18 @@ class _SenderScreenState extends State<SenderScreen> {
               height: 52,
               child: ElevatedButton(
                 onPressed: () async {
-                  final img = await ImagePicker().pickImage(source: ImageSource.gallery);
+                  final img = await ImagePicker()
+                      .pickImage(source: ImageSource.gallery);
                   if (img != null) setState(() => _image = File(img.path));
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4A90E2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
-                child: const Text('Pick Image', style: TextStyle(fontSize: 15, color: Colors.white)),
+                child: const Text('Pick Image',
+                    style: TextStyle(fontSize: 15, color: Colors.white)),
               ),
             ),
             const SizedBox(height: 10),
@@ -246,13 +375,22 @@ class _SenderScreenState extends State<SenderScreen> {
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _process,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _image == null ? Colors.grey.shade800 : const Color(0xFF50E3C2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  backgroundColor: _image == null
+                      ? Colors.grey.shade800
+                      : const Color(0xFF50E3C2),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
                 child: _isLoading
-                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text('Convert to Sound', style: TextStyle(fontSize: 15, color: Colors.black)),
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2))
+                    : const Text('Convert to Sound',
+                        style: TextStyle(
+                            fontSize: 15, color: Colors.black)),
               ),
             ),
           ],
@@ -262,9 +400,9 @@ class _SenderScreenState extends State<SenderScreen> {
   }
 }
 
-// ============================================
+// ─────────────────────────────────────────────────────────────────────────────
 // AUDIO PLAYER DIALOG
-// ============================================
+// ─────────────────────────────────────────────────────────────────────────────
 class AudioPlayerDialog extends StatefulWidget {
   final Uint8List audioBytes;
   const AudioPlayerDialog({super.key, required this.audioBytes});
@@ -281,13 +419,15 @@ class _AudioPlayerDialogState extends State<AudioPlayerDialog> {
   @override
   void initState() {
     super.initState();
-    _player.onPlayerComplete.listen((_) => setState(() => isPlaying = false));
+    _player.onPlayerComplete.listen((_) {
+      if (mounted) setState(() => isPlaying = false);
+    });
     _prepareAudioFile();
   }
 
   Future<void> _prepareAudioFile() async {
     final dir = await getTemporaryDirectory();
-    _audioFile = File('${dir.path}/audio.wav');
+    _audioFile = File('${dir.path}/soundpixel_output.wav');
     await _audioFile!.writeAsBytes(widget.audioBytes);
   }
 
@@ -310,8 +450,10 @@ class _AudioPlayerDialogState extends State<AudioPlayerDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: const Color(0xFF161B22),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Audio Ready', style: TextStyle(color: Colors.white)),
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title:
+          const Text('Audio Ready', style: TextStyle(color: Colors.white)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -320,7 +462,13 @@ class _AudioPlayerDialogState extends State<AudioPlayerDialog> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton(
-                icon: Icon(isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled, size: 52, color: const Color(0xFF4A90E2)),
+                icon: Icon(
+                  isPlaying
+                      ? Icons.pause_circle_filled
+                      : Icons.play_circle_filled,
+                  size: 52,
+                  color: const Color(0xFF4A90E2),
+                ),
                 onPressed: _togglePlay,
               ),
             ],
@@ -351,29 +499,35 @@ class _AudioPlayerDialogState extends State<AudioPlayerDialog> {
   }
 }
 
-// ============================================
+// ─────────────────────────────────────────────────────────────────────────────
 // RECEIVER SCREEN
-// ============================================
+// ─────────────────────────────────────────────────────────────────────────────
 class ReceiverScreen extends StatefulWidget {
   const ReceiverScreen({super.key});
+
   @override
   State<ReceiverScreen> createState() => _ReceiverScreenState();
 }
 
 class _ReceiverScreenState extends State<ReceiverScreen> {
   bool _isLoading = false;
-  bool _isRecording = false;
 
   Future<void> _upload() async {
-    final res = await FilePicker.platform.pickFiles(type: FileType.audio);
+    final res =
+        await FilePicker.platform.pickFiles(type: FileType.audio);
     if (res == null) return;
 
     setState(() => _isLoading = true);
 
     try {
-      var request = http.MultipartRequest('POST', Uri.parse("http://10.0.2.2:8000/receiver/process"));
-      request.files.add(await http.MultipartFile.fromPath('file', res.files.single.path!));
-      var response = await request.send();
+      final url = '${AppConfig.serverUrl}/receiver/process';
+      var request = http.MultipartRequest('POST', Uri.parse(url));
+      request.files.add(await http.MultipartFile.fromPath(
+          'file', res.files.single.path!));
+
+      final response = await request
+          .send()
+          .timeout(const Duration(minutes: 5));
 
       if (response.statusCode == 200) {
         final bytes = await response.stream.toBytes();
@@ -381,73 +535,57 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ReceiverResultPage(
+            builder: (_) => ReceiverResultPage(
               imageBytes: bytes,
               audioFileName: res.files.single.name,
             ),
           ),
         );
+      } else {
+        final body = await response.stream.bytesToString();
+        throw Exception(
+            'Server error ${response.statusCode}: $body');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e',
+              style: const TextStyle(fontSize: 13)),
+          backgroundColor: Colors.red.shade800,
+          duration: const Duration(seconds: 5),
+        ));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _record() async {
-    setState(() => _isRecording = true);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Recording started...'),
-        backgroundColor: Color(0xFF50E3C2),
-        duration: Duration(seconds: 2),
+  void _showRecordComingSoon() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF161B22),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
+        title: const Text('Coming Soon',
+            style: TextStyle(color: Colors.white, fontSize: 16)),
+        content: Text(
+          'Live recording will be available in a future update.\n\n'
+          'Use Upload to select a .wav audio file.',
+          style: TextStyle(
+              color: Colors.white.withOpacity(0.7), fontSize: 13),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF50E3C2)),
+            child: const Text('Got it',
+                style: TextStyle(color: Colors.black)),
+          ),
+        ],
       ),
     );
-    
-    await Future.delayed(const Duration(seconds: 3));
-    
-    if (mounted) {
-      setState(() => _isRecording = false);
-      _processRecordedAudio();
-    }
-  }
-
-  Future<void> _processRecordedAudio() async {
-    setState(() => _isLoading = true);
-    
-    try {
-      var request = http.MultipartRequest('POST', Uri.parse("http://10.0.2.2:8000/receiver/process"));
-      
-      final testFile = File('${(await getTemporaryDirectory()).path}/recorded_audio.wav');
-      if (await testFile.exists()) {
-        request.files.add(await http.MultipartFile.fromPath('file', testFile.path));
-        var response = await request.send();
-        
-        if (response.statusCode == 200) {
-          final bytes = await response.stream.toBytes();
-          if (!mounted) return;
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ReceiverResultPage(
-                imageBytes: bytes,
-                audioFileName: 'recorded_audio.wav',
-              ),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
   }
 
   @override
@@ -455,7 +593,8 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0C10),
       appBar: AppBar(
-        title: const Text('RECEIVER', style: TextStyle(color: Colors.white, letterSpacing: 2)),
+        title: const Text('RECEIVER',
+            style: TextStyle(color: Colors.white, letterSpacing: 2)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
@@ -470,7 +609,8 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
           children: [
             Text(
               'Ready to receive',
-              style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.4)),
+              style: TextStyle(
+                  fontSize: 13, color: Colors.white.withOpacity(0.4)),
             ),
             const SizedBox(height: 16),
             Expanded(
@@ -485,15 +625,19 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        _isRecording ? Icons.mic : Icons.mic_none_outlined,
+                        _isLoading
+                            ? Icons.hourglass_top
+                            : Icons.mic_none_outlined,
                         size: 60,
-                        color: _isRecording ? Colors.red : const Color(0xFF50E3C2).withOpacity(0.5),
+                        color: _isLoading
+                            ? const Color(0xFF4A90E2).withOpacity(0.7)
+                            : const Color(0xFF50E3C2).withOpacity(0.5),
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        _isRecording ? 'Recording...' : 'Listening...',
+                        _isLoading ? 'Processing...' : 'Listening...',
                         style: TextStyle(
-                          color: _isRecording ? Colors.red : Colors.white.withOpacity(0.3),
+                          color: Colors.white.withOpacity(0.3),
                           fontSize: 14,
                         ),
                       ),
@@ -502,14 +646,17 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(14, (i) {
                           return AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
+                            duration:
+                                const Duration(milliseconds: 200),
                             width: 3,
-                            height: _isRecording ? 14.0 + (i % 5) * 8 : 14.0 + (i % 4) * 6,
-                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            height: _isLoading
+                                ? 10.0 + (i % 7) * 6
+                                : 14.0 + (i % 4) * 6,
+                            margin: const EdgeInsets.symmetric(
+                                horizontal: 3),
                             decoration: BoxDecoration(
-                              color: _isRecording 
-                                  ? Colors.red.withOpacity(0.3 + (i * 0.04))
-                                  : const Color(0xFF50E3C2).withOpacity(0.3 + (i * 0.04)),
+                              color: const Color(0xFF50E3C2)
+                                  .withOpacity(0.3 + (i * 0.04)),
                               borderRadius: BorderRadius.circular(2),
                             ),
                           );
@@ -525,28 +672,34 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _isLoading || _isRecording ? null : _upload,
+                    onPressed: _isLoading ? null : _upload,
                     icon: const Icon(Icons.upload_file, size: 18),
                     label: const Text('Upload'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4A90E2),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : (_isRecording ? () {} : _record),
-                    icon: Icon(_isRecording ? Icons.stop : Icons.mic, size: 18),
-                    label: Text(_isRecording ? 'Stop' : 'Record'),
+                    onPressed: _showRecordComingSoon,
+                    icon: const Icon(Icons.mic, size: 18),
+                    label: const Text('Record'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _isRecording ? Colors.red : const Color(0xFF50E3C2),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      backgroundColor:
+                          const Color(0xFF50E3C2).withOpacity(0.35),
+                      foregroundColor: Colors.white54,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),
                 ),
@@ -559,14 +712,17 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
   }
 }
 
-// ============================================
+// ─────────────────────────────────────────────────────────────────────────────
 // RECEIVER RESULT SCREEN
-// ============================================
+// ─────────────────────────────────────────────────────────────────────────────
 class ReceiverResultPage extends StatefulWidget {
   final Uint8List imageBytes;
   final String audioFileName;
 
-  const ReceiverResultPage({super.key, required this.imageBytes, required this.audioFileName});
+  const ReceiverResultPage(
+      {super.key,
+      required this.imageBytes,
+      required this.audioFileName});
 
   @override
   State<ReceiverResultPage> createState() => _ReceiverResultPageState();
@@ -578,19 +734,20 @@ class _ReceiverResultPageState extends State<ReceiverResultPage> {
 
   Future<void> _fetchReport() async {
     setState(() => _isLoadingReport = true);
-
     try {
-      final url = "http://10.0.2.2:8000/receiver/report/latest";
-      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      final url = '${AppConfig.serverUrl}/receiver/report/latest';
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         _reportData = jsonDecode(response.body);
-        _showReportDialog();
+        if (mounted) _showReportDialog();
       } else {
-        _showSimpleReport();
+        if (mounted) _showSimpleReport();
       }
-    } catch (e) {
-      _showSimpleReport();
+    } catch (_) {
+      if (mounted) _showSimpleReport();
     } finally {
       if (mounted) setState(() => _isLoadingReport = false);
     }
@@ -598,58 +755,73 @@ class _ReceiverResultPageState extends State<ReceiverResultPage> {
 
   void _showReportDialog() {
     if (_reportData == null) return;
-
-    final data = _reportData!;
+    final data    = _reportData!;
     final quality = data['quality_status'] ?? 'Unknown';
-    Color qualityColor;
-    switch (quality) {
-      case 'Excellent':
-        qualityColor = Colors.green;
-        break;
-      case 'Good':
-        qualityColor = Colors.lightGreen;
-        break;
-      case 'Fair':
-        qualityColor = Colors.orange;
-        break;
-      case 'Poor':
-        qualityColor = Colors.red;
-        break;
-      default:
-        qualityColor = Colors.white;
-    }
+
+    final qualityColor = switch (quality) {
+      'Excellent' => Colors.green,
+      'Good'      => Colors.lightGreen,
+      'Fair'      => Colors.orange,
+      'Poor'      => Colors.red,
+      _           => Colors.white,
+    };
 
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF161B22),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (context) => Padding(
+      shape: const RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => Padding(
         padding: const EdgeInsets.all(22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Quality Report', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600)),
+            const Text('Quality Report',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600)),
             const Divider(color: Colors.white24),
             const SizedBox(height: 8),
-            Text('Original: ${data['image_name']}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+            Text('Original: ${data['image_name']}',
+                style: const TextStyle(
+                    color: Colors.white70, fontSize: 13)),
             const SizedBox(height: 16),
-            Text('MSE: ${data['mse']}', style: const TextStyle(color: Colors.white, fontFamily: 'monospace')),
-            Text('PSNR: ${data['psnr']} dB', style: const TextStyle(color: Colors.white, fontFamily: 'monospace')),
+            Text('MSE: ${data['mse']}',
+                style: const TextStyle(
+                    color: Colors.white, fontFamily: 'monospace')),
+            Text('PSNR: ${data['psnr']} dB',
+                style: const TextStyle(
+                    color: Colors.white, fontFamily: 'monospace')),
             const SizedBox(height: 14),
-            Text('Quality: ${data['quality_status']}', style: TextStyle(color: qualityColor, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Quality: $quality',
+                style: TextStyle(
+                    color: qualityColor,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
-            const Text('PSNR Scale:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 13)),
-            const Text('>35 dB: Excellent', style: TextStyle(color: Colors.white70, fontSize: 11)),
-            const Text('30-35 dB: Good', style: TextStyle(color: Colors.white70, fontSize: 11)),
-            const Text('20-30 dB: Fair', style: TextStyle(color: Colors.white70, fontSize: 11)),
-            const Text('<20 dB: Poor', style: TextStyle(color: Colors.white70, fontSize: 11)),
+            const Text('PSNR Scale:',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13)),
+            const Text('>35 dB: Excellent',
+                style: TextStyle(color: Colors.white70, fontSize: 11)),
+            const Text('30-35 dB: Good',
+                style: TextStyle(color: Colors.white70, fontSize: 11)),
+            const Text('20-30 dB: Fair',
+                style: TextStyle(color: Colors.white70, fontSize: 11)),
+            const Text('<20 dB: Poor',
+                style: TextStyle(color: Colors.white70, fontSize: 11)),
             const SizedBox(height: 22),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.white10),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white10),
                 child: const Text('Close'),
               ),
             ),
@@ -663,25 +835,34 @@ class _ReceiverResultPageState extends State<ReceiverResultPage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF161B22),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (context) => Padding(
+      shape: const RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => Padding(
         padding: const EdgeInsets.all(22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Quality Report', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600)),
+            const Text('Quality Report',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600)),
             const Divider(color: Colors.white24),
             const SizedBox(height: 16),
-            const Text('Audio successfully decoded', style: TextStyle(color: Colors.green)),
+            const Text('Audio successfully decoded',
+                style: TextStyle(color: Colors.green)),
             const SizedBox(height: 8),
-            const Text('Quality metrics not available', style: TextStyle(color: Colors.orange)),
+            const Text('Quality metrics not available',
+                style: TextStyle(color: Colors.orange)),
             const SizedBox(height: 22),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.white10),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white10),
                 child: const Text('Close'),
               ),
             ),
@@ -696,7 +877,8 @@ class _ReceiverResultPageState extends State<ReceiverResultPage> {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0C10),
       appBar: AppBar(
-        title: const Text('Result', style: TextStyle(color: Colors.white, letterSpacing: 2)),
+        title: const Text('Result',
+            style: TextStyle(color: Colors.white, letterSpacing: 2)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
@@ -727,12 +909,19 @@ class _ReceiverResultPageState extends State<ReceiverResultPage> {
                 onPressed: _isLoadingReport ? null : _fetchReport,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF50E3C2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
                 child: _isLoadingReport
-                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text('Show Report', style: TextStyle(fontSize: 15, color: Colors.black)),
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2))
+                    : const Text('Show Report',
+                        style: TextStyle(
+                            fontSize: 15, color: Colors.black)),
               ),
             ),
           ],
