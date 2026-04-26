@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-04-25T19:35:05",
+  "enhanced": true,
+  "upscaler": "EDSR x4 -> 1280x1280",
+  "audio_filename": "soundpixel_output(3).wav",
+  "mse": null,
+  "psnr": null,
+  "quality_status": null,
+  "raw_size_bytes": 17654,
+  "raw_resolution": "192x192",
+  "final_size_bytes": 468567,
+  "final_resolution": "1280x1280"
+}

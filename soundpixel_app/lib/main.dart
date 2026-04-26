@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:gal/gal.dart';
 
 void main() => runApp(const SoundPixelApp());
 
@@ -565,23 +566,46 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF161B22),
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16)),
-        title: const Text('Coming Soon',
-            style: TextStyle(color: Colors.white, fontSize: 16)),
-        content: Text(
-          'Live recording will be available in a future update.\n\n'
-          'Use Upload to select a .wav audio file.',
-          style: TextStyle(
-              color: Colors.white.withOpacity(0.7), fontSize: 13),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(children: [
+          Icon(Icons.mic_off_outlined, color: Color(0xFF50E3C2), size: 20),
+          SizedBox(width: 8),
+          Text('Not Available Yet', style: TextStyle(color: Colors.white, fontSize: 15)),
+        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Live recording isn\'t supported yet because the app '
+              'needs a specific audio format (WAV) that microphone '
+              'libraries don\'t produce directly on all phones.',
+              style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 13, height: 1.5),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF50E3C2).withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF50E3C2).withOpacity(0.25)),
+              ),
+              child: Row(children: [
+                const Icon(Icons.upload_file, color: Color(0xFF50E3C2), size: 16),
+                const SizedBox(width: 8),
+                Expanded(child: Text(
+                  'Use Upload to select a .wav file you received.',
+                  style: TextStyle(color: const Color(0xFF50E3C2).withOpacity(0.9), fontSize: 12),
+                )),
+              ]),
+            ),
+          ],
         ),
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF50E3C2)),
-            child: const Text('Got it',
-                style: TextStyle(color: Colors.black)),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF50E3C2)),
+            child: const Text('Got it', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -731,7 +755,48 @@ class ReceiverResultPage extends StatefulWidget {
 class _ReceiverResultPageState extends State<ReceiverResultPage> {
   Map<String, dynamic>? _reportData;
   bool _isLoadingReport = false;
+  bool _isSaving        = false;
 
+  // ── Save to gallery via gal ────────────────────────────────────────────────
+  Future<void> _saveImage() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+    try {
+      await Gal.putImageBytes(widget.imageBytes, name: 'soundpixel_${DateTime.now().millisecondsSinceEpoch}');
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(children: [
+            Icon(Icons.check_circle, color: Colors.black, size: 18),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text('Saved to Gallery',
+                  style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500)),
+            ),
+          ]),
+          backgroundColor: const Color(0xFF50E3C2),
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Save failed: $e', style: const TextStyle(fontSize: 13)),
+        backgroundColor: Colors.red.shade800,
+        duration: const Duration(seconds: 4),
+      ));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  // ── Fetch report ────────────────────────────────────────────────────────────
   Future<void> _fetchReport() async {
     setState(() => _isLoadingReport = true);
     try {
@@ -741,13 +806,20 @@ class _ReceiverResultPageState extends State<ReceiverResultPage> {
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        _reportData = jsonDecode(response.body);
-        if (mounted) _showReportDialog();
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        _reportData = data;
+        final hasRealData = data['mse'] != null &&
+            data['psnr'] != null &&
+            data['quality_status'] != null &&
+            data['quality_status'] != 'Unknown';
+        if (mounted) {
+          if (hasRealData) _showReportDialog(); else _showNoDataDialog();
+        }
       } else {
-        if (mounted) _showSimpleReport();
+        if (mounted) _showNoDataDialog();
       }
     } catch (_) {
-      if (mounted) _showSimpleReport();
+      if (mounted) _showNoDataDialog();
     } finally {
       if (mounted) setState(() => _isLoadingReport = false);
     }
@@ -756,13 +828,15 @@ class _ReceiverResultPageState extends State<ReceiverResultPage> {
   void _showReportDialog() {
     if (_reportData == null) return;
     final data    = _reportData!;
-    final quality = data['quality_status'] ?? 'Unknown';
+    final quality = (data['quality_status'] as String?) ?? 'Unknown';
+    final mse     = data['mse'];
+    final psnr    = data['psnr'];
 
     final qualityColor = switch (quality) {
-      'Excellent' => Colors.green,
-      'Good'      => Colors.lightGreen,
-      'Fair'      => Colors.orange,
-      'Poor'      => Colors.red,
+      'Excellent' => const Color(0xFF4CAF50),
+      'Good'      => const Color(0xFF8BC34A),
+      'Fair'      => const Color(0xFFFFA726),
+      'Poor'      => const Color(0xFFEF5350),
       _           => Colors.white,
     };
 
@@ -770,59 +844,45 @@ class _ReceiverResultPageState extends State<ReceiverResultPage> {
       context: context,
       backgroundColor: const Color(0xFF161B22),
       shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(16))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => Padding(
-        padding: const EdgeInsets.all(22),
+        padding: const EdgeInsets.fromLTRB(22, 22, 22, 30),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('Quality Report',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600)),
-            const Divider(color: Colors.white24),
-            const SizedBox(height: 8),
-            Text('Original: ${data['image_name']}',
-                style: const TextStyle(
-                    color: Colors.white70, fontSize: 13)),
+                style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
-            Text('MSE: ${data['mse']}',
-                style: const TextStyle(
-                    color: Colors.white, fontFamily: 'monospace')),
-            Text('PSNR: ${data['psnr']} dB',
-                style: const TextStyle(
-                    color: Colors.white, fontFamily: 'monospace')),
+            const Divider(color: Colors.white12),
             const SizedBox(height: 14),
-            Text('Quality: $quality',
-                style: TextStyle(
-                    color: qualityColor,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold)),
+            Row(children: [
+              Expanded(child: _metricCard(label: 'MSE',  value: mse?.toString()            ?? '—', sub: 'Mean Square Error',    color: const Color(0xFF4A90E2))),
+              const SizedBox(width: 12),
+              Expanded(child: _metricCard(label: 'PSNR', value: psnr != null ? '$psnr dB' : '—', sub: 'Peak Signal-to-Noise', color: const Color(0xFF50E3C2))),
+            ]),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: qualityColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: qualityColor.withOpacity(0.35)),
+              ),
+              child: Column(children: [
+                Text(quality, style: TextStyle(color: qualityColor, fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                const SizedBox(height: 2),
+                Text('Reconstruction Quality', style: TextStyle(color: qualityColor.withOpacity(0.7), fontSize: 11)),
+              ]),
+            ),
             const SizedBox(height: 20),
-            const Text('PSNR Scale:',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13)),
-            const Text('>35 dB: Excellent',
-                style: TextStyle(color: Colors.white70, fontSize: 11)),
-            const Text('30-35 dB: Good',
-                style: TextStyle(color: Colors.white70, fontSize: 11)),
-            const Text('20-30 dB: Fair',
-                style: TextStyle(color: Colors.white70, fontSize: 11)),
-            const Text('<20 dB: Poor',
-                style: TextStyle(color: Colors.white70, fontSize: 11)),
-            const SizedBox(height: 22),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white10),
-                child: const Text('Close'),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.white10, padding: const EdgeInsets.symmetric(vertical: 14)),
+                child: const Text('Close', style: TextStyle(color: Colors.white70)),
               ),
             ),
           ],
@@ -831,39 +891,59 @@ class _ReceiverResultPageState extends State<ReceiverResultPage> {
     );
   }
 
-  void _showSimpleReport() {
+  Widget _metricCard({required String label, required String value, required String sub, required Color color}) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1)),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700, fontFamily: 'monospace')),
+        const SizedBox(height: 2),
+        Text(sub, style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 10)),
+      ]),
+    );
+  }
+
+  void _showNoDataDialog() {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF161B22),
-      shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => Padding(
-        padding: const EdgeInsets.all(22),
+        padding: const EdgeInsets.fromLTRB(22, 22, 22, 30),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Quality Report',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600)),
-            const Divider(color: Colors.white24),
+            const Text('Quality Report', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
+            const Divider(color: Colors.white12),
             const SizedBox(height: 16),
-            const Text('Audio successfully decoded',
-                style: TextStyle(color: Colors.green)),
-            const SizedBox(height: 8),
-            const Text('Quality metrics not available',
-                style: TextStyle(color: Colors.orange)),
+            const Row(children: [
+              Icon(Icons.check_circle_outline, color: Color(0xFF50E3C2), size: 18),
+              SizedBox(width: 8),
+              Text('Audio decoded successfully', style: TextStyle(color: Color(0xFF50E3C2), fontSize: 13)),
+            ]),
+            const SizedBox(height: 10),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(Icons.info_outline, color: Colors.white.withOpacity(0.35), size: 16),
+              const SizedBox(width: 8),
+              Expanded(child: Text(
+                'Quality metrics are being calculated.\nTry again in a moment.',
+                style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12, height: 1.4),
+              )),
+            ]),
             const SizedBox(height: 22),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white10),
-                child: const Text('Close'),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.white10, padding: const EdgeInsets.symmetric(vertical: 14)),
+                child: const Text('Close', style: TextStyle(color: Colors.white70)),
               ),
             ),
           ],
@@ -877,55 +957,67 @@ class _ReceiverResultPageState extends State<ReceiverResultPage> {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0C10),
       appBar: AppBar(
-        title: const Text('Result',
-            style: TextStyle(color: Colors.white, letterSpacing: 2)),
+        title: const Text('Result', style: TextStyle(color: Colors.white, letterSpacing: 2)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: _isSaving
+                ? const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: SizedBox(width: 20, height: 20,
+                        child: CircularProgressIndicator(color: Color(0xFF50E3C2), strokeWidth: 2)),
+                  )
+                : IconButton(
+                    onPressed: _saveImage,
+                    tooltip: 'Save to Gallery',
+                    icon: Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF50E3C2).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF50E3C2).withOpacity(0.4), width: 1.2),
+                      ),
+                      child: const Icon(Icons.save_alt_rounded, color: Color(0xFF50E3C2), size: 18),
+                    ),
+                  ),
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Expanded(
-              child: Center(
-                child: InteractiveViewer(
-                  panEnabled: true,
-                  boundaryMargin: const EdgeInsets.all(20),
-                  minScale: 0.5,
-                  maxScale: 4,
-                  child: Image.memory(widget.imageBytes),
-                ),
+        child: Column(children: [
+          Expanded(
+            child: Center(
+              child: InteractiveViewer(
+                panEnabled: true,
+                boundaryMargin: const EdgeInsets.all(20),
+                minScale: 0.5, maxScale: 4,
+                child: Image.memory(widget.imageBytes),
               ),
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _isLoadingReport ? null : _fetchReport,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF50E3C2),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
-                ),
-                child: _isLoadingReport
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2))
-                    : const Text('Show Report',
-                        style: TextStyle(
-                            fontSize: 15, color: Colors.black)),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity, height: 48,
+            child: ElevatedButton(
+              onPressed: _isLoadingReport ? null : _fetchReport,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF50E3C2),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
               ),
+              child: _isLoadingReport
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('Show Report', style: TextStyle(fontSize: 15, color: Colors.black)),
             ),
-          ],
-        ),
+          ),
+        ]),
       ),
     );
   }
